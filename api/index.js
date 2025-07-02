@@ -2,9 +2,9 @@ import express from "express";
 import connectDB from "./config/connectDB.js";
 import JobModel from "./models/JobModel.js";
 import { v4 as uuidv4 } from "uuid";
-import { Redis } from "ioredis";
+import Redis from "ioredis";
 import { MongoClient } from "mongodb";
-
+import cleanData from "../utils/cleanData.js";
 const app = express();
 app.use(express.json());
 
@@ -39,26 +39,46 @@ app.post("/jobs", async (req, res) => {
 });
 
 //GET JOB API
-app.get('/jobs/:requestId',async(req,res)=>{
-    try {
+app.get("/jobs/:requestId", async (req, res) => {
+  try {
     const job = await JobModel.findOne({ request_id: req.params.requestId });
-    if (!job) return res.status(404).json({ error: 'Job not found' });
-    
-    if (job.status === 'complete') {
-      res.json({ status: 'complete', result: job.result });
-    } else if (job.status === 'failed') {
-      res.json({ status: 'failed', error: job.error });
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    if (job.status === "completed") {
+      res.json({ status: "completed", result: job.result });
+    } else if (job.status === "failed") {
+      res.json({ status: "failed", error: job.error });
     } else {
-      res.json({ status: 'processing' });
+      res.json({ status: "processing" });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-})
+});
+//VENDOR-WEBHOOK API
+
+app.post("/vendor-webhook/:vendor", async (req, res) => {
+  try {
+    const { request_id, data } = req.body;
+    const cleanedData = cleanData(data);
+
+    await JobModel.updateOne(
+      { request_id },
+      {
+        $set: {
+          status: "completed",
+          result: cleanedData,
+        },
+      }
+    );
+    res.json({ status: "received" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running @ 3000`);
-  });
+
+app.listen(PORT, () => {
+  console.log(`Server running @ 3000`);
 });
