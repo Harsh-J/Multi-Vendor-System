@@ -4,7 +4,8 @@ import JobModel from "./models/JobModel.js";
 import { v4 as uuidv4 } from "uuid";
 import Redis from "ioredis";
 import { MongoClient } from "mongodb";
-import cleanData from "../utils/cleanData.js";
+
+import mongoose from "mongoose";
 const app = express();
 app.use(express.json());
 
@@ -12,9 +13,9 @@ const redis = new Redis({ host: process.env.REDIS_HOST || "localhost" });
 const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/datafetch";
 let db;
 
-MongoClient.connect(mongoUri, { useUnifiedTopology: true })
-  .then((client) => {
-    db = client.db();
+mongoose
+  .connect(mongoUri)
+  .then(() => {
     console.log("Connected to MongoDB");
   })
   .catch((err) => console.error("MongoDB connection error:", err));
@@ -49,7 +50,7 @@ app.get("/jobs/:requestId", async (req, res) => {
     } else if (job.status === "failed") {
       res.json({ status: "failed", error: job.error });
     } else {
-      res.json({ status: "processing" });
+      res.json({ status: "processing", vendor: job.vendor });
     }
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -76,7 +77,22 @@ app.post("/vendor-webhook/:vendor", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
+function cleanData(data) {
+  const clean = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === "string") {
+      clean[key] = value
+        .trim()
+        .replace(
+          /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+          "[email redacted]"
+        );
+    } else {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {

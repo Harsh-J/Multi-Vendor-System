@@ -1,3 +1,5 @@
 api/node_modules
 worker/node_modules
 /.env
+mock-vendors/async/node_modules
+mock-vendors/sync/node_modules

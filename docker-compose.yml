@@ -1,0 +1,49 @@
+
+
+services:
+  api:
+    build: ./api
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_URI=mongodb://mongo:27017/datafetch
+    depends_on:
+      - redis
+      - mongo
+    volumes:
+      - ./api:/app
+  worker:
+    build: ./worker
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_URI=mongodb://mongo:27017/datafetch
+      - SYNC_VENDOR_URL=http://sync-vendor:3001
+      - ASYNC_VENDOR_URL=http://async-vendor:3002
+    depends_on:
+      - redis
+      - mongo
+      - sync-vendor
+      - async-vendor
+    volumes:
+      - ./worker:/app
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
+  mongo:
+    image: mongo:5
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+  sync-vendor:
+    build: ./mock-vendors/sync
+    ports:
+      - "3001:3001"
+  async-vendor:
+    build: ./mock-vendors/async
+    ports:
+      - "3002:3002"
+volumes:
+  mongo-data:
